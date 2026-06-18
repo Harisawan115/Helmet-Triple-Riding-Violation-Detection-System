@@ -1,182 +1,181 @@
+# 🪖 Helmet & Triple Riding Violation Detection System
 
-# Create final testing guide
-guide = '''# 🚨 FINAL TESTING GUIDE - Red Light Violation Fix
+An AI-powered traffic violation detection system that automatically identifies **helmet non-compliance** and **triple riding** on motorcycles from images, video files, or a live webcam feed — built with YOLOv8n, ResNet18, and Streamlit.
 
-## ❌ Problems Fixed:
+---
+## 🚀 Demo
 
-### 1. OpenCV Error: `!buf.empty()`
-**Reason:** File read nahi ho rahi thi  
-**Solution:** Ab PIL (Pillow) use karta hai image loading ke liye
-
-### 2. Red Light Violation Detect Nahi Ho Rahi
-**Reason:** Logic galat tha - car ko history chahiye thi  
-**Solution:** Ab "in_violation_zone" check hai - agar car clearly line ke aage hai to detect hoga
+| Feature | Description |
+|---------|-------------|
+| 🪖 No Helmet Detection | Detects motorcycle riders not wearing a helmet |
+| 👥 Triple Riding | Detects 3 or more persons on a single motorcycle |
+| 📷 Input Modes | Image upload, Video upload, Live Webcam |
+| 📊 Violation Log | Real-time log with timestamps, exportable to CSV |
 
 ---
 
-## 🚀 Kaise Chalaye
+## 🛠️ Tech Stack
 
-### Step 1: Nayi File Use Karein
+| Component | Technology |
+|-----------|-----------|
+| Object Detection | [YOLOv8n](https://github.com/ultralytics/ultralytics) — COCO pre-trained |
+| Helmet Classifier | ResNet18 (PyTorch) — fine-tuned |
+| Vehicle Tracker | Custom IoU-based tracker |
+| Web Interface | [Streamlit](https://streamlit.io) |
+| Image Processing | OpenCV, Pillow |
+| Data Handling | Pandas, NumPy |
+
+---
+
+## 📦 Dataset
+
+### Helmet Detection Dataset
+The ResNet18 classifier is trained on a motorcycle helmet detection dataset containing real images of motorcycle riders with and without helmets.
+
+**Download from Roboflow Universe:**
+
+👉 **[Helmet Detection Dataset — Roboflow Universe](https://universe.roboflow.com/leo-ueno/helmet-detection-for-motorcyclists)**
+
+Alternative dataset:
+
+👉 **[Bike Helmet Detection — Roboflow](https://universe.roboflow.com/bike-helmets/bike-helmet-detection-2vdjo)**
+
+**After downloading:**
+1. Select **Folder Structure** format when downloading
+2. Place the images in the following structure:
+
+```
+data/
+└── helmet_dataset/
+    ├── with_helmet/       ← images of riders wearing helmets
+    └── without_helmet/    ← images of riders without helmets
+```
+
+> **Note:** YOLOv8n uses COCO pre-trained weights and downloads automatically — no dataset needed for detection.
+
+---
+
+## ⚙️ Installation
+
+### 1. Clone the repository
 ```bash
-streamlit run app_final.py
+git clone https://github.com/your-username/helmet-triple-riding-detection.git
+cd helmet-triple-riding-detection
 ```
 
-### Step 2: Image Upload Karein
-```
-📁 Upload Image/Video select karein
-Aapki image (jo aapne bheji hai) upload karein
+### 2. Create a virtual environment
+```bash
+python -m venv venv
+
+# Windows
+venv\Scripts\activate
+
+# macOS / Linux
+source venv/bin/activate
 ```
 
-### Step 3: Debug Mode ON
+### 3. Install dependencies
+```bash
+pip install -r requirements.txt
 ```
-🔍 Debug Mode checkbox click karein
-```
+
+### 4. Download the dataset
+Download from the link above and place images in `data/helmet_dataset/with_helmet/` and `data/helmet_dataset/without_helmet/`.
 
 ---
 
-## 🎯 Aapki Image Ke Liye Special Settings
+## 🏋️ Training the Models
 
-Aapki image mein multiple cars hain traffic light pe. Iske liye:
+Run the training script to train ResNet18 and the LSTM trajectory predictor:
 
-### Important Settings:
-1. **Stop Line Position:** 70% of image height
-   - Agar cars neeche hain to violation detect hoga
-   
-2. **Traffic Light:** RED hona chahiye
-   - Image load hote hi timer start hota hai
-   - ~6 seconds baad RED light ayega
-   
-3. **Confidence:** 0.3 (30%) - Lower hai taake zyada cars detect hon
+```bash
+python train_models.py
+```
+
+**What gets trained:**
+
+| Model | Epochs | Output File |
+|-------|--------|-------------|
+| ResNet18 Helmet Classifier | 25 | `models/helmet_resnet18.pth` |
+| LSTM Trajectory Predictor | 50 | `models/lstm_tracker.pth` |
+
+> YOLOv8n (`yolov8n.pt`) downloads automatically on first run — no training needed.
+
+**Training output files saved to `outputs/`:**
+- `resnet_training_curves.png` — loss and accuracy curves
+- `confusion_matrix.png` — validation confusion matrix
 
 ---
 
-## 🔍 Debug Mode Mein Kya Dekhein
+## ▶️ Running the Application
 
-### Expected Output:
-```
-Frame: 1
-Light: RED
-Cars: 5, Motorcycles: 0, Persons: 2
-Stop Line Y: 420
-Car ID:0 cls:car
-  bottom_y:450 line:420
-  crossed:True was_before:True
-  in_zone:True confirmed:False
-  ✓ VIOLATION DETECTED!
+```bash
+streamlit run app.py
 ```
 
-### Samajhne Ke Liye:
-- `bottom_y:450` - Car ka front bumper position
-- `line:420` - Stop line ki position  
-- `in_zone:True` - Car violation zone mein hai (line se 50px aage)
-- `✓ VIOLATION DETECTED!` - Success!
+Then open your browser at `http://localhost:8501`
+
+**Sidebar options:**
+- Confidence threshold (default: 0.3)
+- Debug mode toggle
 
 ---
 
-## 🛠️ Agar Ab Bhi Na Chale
+## 🧠 How It Works
 
-### Problem 1: "Image load nahi ho rahi"
-**Solution:**
-```python
-# Image ko JPG mein convert karein:
-from PIL import Image
-img = Image.open('your_image.webp')  # ya .png
-img.save('converted.jpg', 'JPEG')
+### Violation Detection Pipeline
+
+```
+Video Frame
+    │
+    ▼
+YOLOv8n ──────────────────── Detects motorcycles + persons
+    │
+    ▼
+IoU Tracker ──────────────── Assigns consistent IDs across frames
+    │
+    ├──► Helmet Check
+    │         │
+    │    Crop head region (top 1/3 of rider)
+    │         │
+    │    ResNet18 classifier
+    │         │
+    │    helmet_prob < 0.5 → 🪖 NO HELMET VIOLATION
+    │
+    └──► Triple Riding Check
+              │
+         Count persons inside motorcycle bbox
+              │
+         count ≥ 3 → 👥 TRIPLE RIDING VIOLATION
 ```
 
-### Problem 2: "Cars detect nahi ho rahi"
-**Solution:**
-```python
-# app_final.py line ~253 pe confidence kam karein:
-results = self.yolo(frame, verbose=False, conf=0.2)  # 0.2 ya 0.1
-```
+### Models Explained
 
-### Problem 3: "Red light hai par violation nahi"
-**Solution:**
-```python
-# Stop line position adjust karein (line ~210):
-self.stop_line_y = int(h * 0.60)  # 60% pe rakhein
-```
+**YOLOv8n** — detects all motorcycles and persons in the frame. Uses COCO pre-trained weights. No training required.
+
+**ResNet18** — binary image classifier fine-tuned to predict `with_helmet` vs `without_helmet`. Uses transfer learning from ImageNet weights. Custom FC head: `Linear(512→256) → BatchNorm → ReLU → Dropout(0.5) → Linear(256→2)`.
+
+**IoU Tracker** — tracks each motorcycle across frames using Intersection over Union matching (threshold: 0.3). Prevents duplicate violation counts for the same vehicle.
 
 ---
 
-## 📊 Aapki Image Analysis
+## 📊 Model Performance
 
-Aapki image mein:
-- 🚗 **5-6 cars** hain
-- 🚦 **Traffic light RED** hai
-- 🛑 **Stop line** cross ho rahi hai
+| Metric | Value |
+|--------|-------|
+| Dataset Size | 574 images |
+| With Helmet | 252 images |
+| Without Helmet | 322 images |
+| Train / Val Split | 80% / 20% |
+| Best Validation Accuracy | 56.52% |
+| Training Epochs | 25 |
 
-**Expected Result:**
-- Har car ke liye "🔴 Red Light Violation" detect honi chahiye
-- License plate read ho (agar visible hai)
-
+> Accuracy can be improved significantly by using a larger dataset (3000+ images per class).
 ---
 
-## 🎓 Quick Test Checklist
+## 📌 Notes
 
-- [ ] `app_final.py` run kiya
-- [ ] Image upload ki
-- [ ] Debug mode ON kiya
-- [ ] Wait kiya 6 seconds (RED light ke liye)
-- [ ] Cars detect hue (debug mein dikhe)
-- [ ] Violation detect hui
-
----
-
-## 📞 Emergency Fix
-
-Agar sab fail ho jaye toh yeh code try karein:
-
-```python
-# Simple test - sirf red light detection
-import cv2
-import numpy as np
-from ultralytics import YOLO
-
-model = YOLO('yolov8n.pt')
-img = cv2.imread('your_image.jpg')
-results = model(img)
-
-# Draw stop line
-h, w = img.shape[:2]
-cv2.line(img, (0, int(h*0.7)), (w, int(h*0.7)), (0,0,255), 5)
-
-# Detect cars
-for det in results[0].boxes:
-    x1,y1,x2,y2 = map(int, det.xyxy[0])
-    cls = int(det.cls)
-    if model.names[cls] in ['car', 'truck']:
-        # Check if crossed
-        if y2 > int(h*0.7):
-            cv2.rectangle(img, (x1,y1), (x2,y2), (0,0,255), 3)
-            cv2.putText(img, "VIOLATION", (x1,y1-10), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 2)
-
-cv2.imshow('Result', img)
-cv2.waitKey(0)
-```
-
----
-
-**🎉 Ab aapki image bhi kaam karegi!**
-'''
-
-with open('final_traffic_violation_system/FINAL_TESTING_GUIDE.md', 'w') as f:
-    f.write(guide)
-
-print("✅ FINAL_TESTING_GUIDE.md created!")
-print("\n" + "="*70)
-print("🎉 FINAL FIX COMPLETE!")
-print("="*70)
-print("\n📁 New File: app_final.py")
-print("\n🔧 Key Fixes:")
-print("   1. ✅ OpenCV error fixed (PIL image loading)")
-print("   2. ✅ Red light detection improved")
-print("   3. ✅ 'in_violation_zone' logic added")
-print("   4. ✅ Error handling for all file types")
-print("   5. ✅ Better debug information")
-print("\n🚀 Run:")
-print("   streamlit run app_final.py")
-print("\n📖 Read FINAL_TESTING_GUIDE.md")
-print("="*70)
+- The system runs on **CPU** by default. If a CUDA-compatible GPU is available, it will be used automatically.
+- Video processing is capped at **300 frames** (~10 seconds at 30fps) in video upload mode.
+- If `helmet_resnet18.pth` is missing, the app falls back to a basic color-based helmet detector with lower accuracy.
+- Run `train_models.py` before `app.py` to generate the model weights.
